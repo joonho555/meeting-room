@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Corporate Room Booking</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .loader {
+            border-top-color: #3b82f6;
+            -webkit-animation: spinner 1.5s linear infinite;
+            animation: spinner 1.5s linear infinite;
+        }
+        @keyframes spinner {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="fixed inset-0 bg-white z-50 flex flex-col items-center justify-center">
+        <div class="loader ease-linear rounded-full border-4 border-slate-100 h-12 w-12 mb-4"></div>
+        <h2 class="text-xl font-semibold text-slate-700">Connecting to system...</h2>
+        <p class="text-sm text-slate-500 mt-2">Authenticating and loading data</p>
+    </div>
+
+    <!-- Header -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+                <h1 class="text-xl font-bold text-slate-900 tracking-tight">WorkSpace<span class="text-blue-600">Reserve</span></h1>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="text-sm text-slate-500 font-medium hidden sm:block" id="user-info"></div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex flex-col lg:flex-row gap-8">
+        
+        <!-- Sidebar Controls -->
+        <aside class="w-full lg:w-72 flex-shrink-0 flex flex-col gap-6">
+            <!-- Date Picker -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+                <h3 class="text-sm font-semibold text-slate-800 uppercase tracking-wider mb-4">Select Date</h3>
+                <input type="date" id="date-picker" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow text-slate-700">
+            </div>
+
+            <!-- Room Selector -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+                <h3 class="text-sm font-semibold text-slate-800 uppercase tracking-wider mb-4">Meeting Rooms</h3>
+                <div id="room-list" class="flex flex-col gap-2">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <!-- Dashboard Stats -->
+            <div class="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl shadow-sm p-6 text-white">
+                <h3 class="text-sm font-medium text-blue-100 mb-1">Today's Utilization</h3>
+                <div class="text-3xl font-bold mb-2" id="utilization-rate">0%</div>
+                <div class="w-full bg-blue-900/50 rounded-full h-2 mt-2">
+                    <div class="bg-white h-2 rounded-full transition-all duration-500" id="utilization-bar" style="width: 0%"></div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Timeline Schedule -->
+        <section class="flex-grow bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
+            <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800" id="schedule-title">Room A</h2>
+                    <p class="text-slate-500 mt-1" id="schedule-subtitle">Loading schedule...</p>
+                </div>
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    Active System
+                </span>
+            </div>
+            
+            <div class="p-6 overflow-y-auto hide-scrollbar" style="max-height: calc(100vh - 250px);">
+                <div id="timeline" class="flex flex-col relative">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Booking Modal -->
+    <div id="booking-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden transform transition-all">
+            <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+                <h3 class="text-lg font-semibold text-slate-800" id="modal-title">Book Room</h3>
+                <p class="text-sm text-slate-500 mt-1" id="modal-subtitle"></p>
+            </div>
+            <div class="p-6">
+                <div id="error-message" class="hidden mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm border border-red-200"></div>
+                <div class="space-y-4">
+                    <div>
+                        <label for="booker-name" class="block text-sm font-medium text-slate-700 mb-1">Your Name</label>
+                        <input type="text" id="booker-name" placeholder="John Doe" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow" required>
+                    </div>
+                    <div>
+                        <label for="meeting-purpose" class="block text-sm font-medium text-slate-700 mb-1">Meeting Purpose</label>
+                        <input type="text" id="meeting-purpose" placeholder="e.g. Quarterly Sync, Client Call" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow" required>
+                    </div>
+                </div>
+            </div>
+            <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                <button type="button" id="btn-cancel" class="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200 transition-colors">
+                    Cancel
+                </button>
+                <button type="button" id="btn-confirm" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors flex items-center gap-2">
+                    Confirm Booking
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed bottom-4 right-4 transform translate-y-20 opacity-0 transition-all duration-300 z-50 flex items-center gap-3 bg-slate-800 text-white px-6 py-4 rounded-xl shadow-lg">
+        <svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        <span id="toast-message" class="font-medium">Action successful</span>
+    </div>
+
+    <!-- Firebase Configuration and Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, collection, onSnapshot, addDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Environment variables
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'corporate-booking-app';
+        let firebaseConfig = { projectId: "mock-project-id" }; // Fallback
+        if (typeof __firebase_config !== 'undefined') {
+            try {
+                firebaseConfig = JSON.parse(__firebase_config);
+            } catch (e) {
+                console.error("Invalid firebase config", e);
+            }
+        }
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // State Variables
+        const rooms = [
+            { id: 'room-a', name: 'Room A', capacity: 4 },
+            { id: 'room-b', name: 'Room B', capacity: 8 },
+            { id: 'conference-large', name: 'Large Conference Room', capacity: 20 }
+        ];
+        
+        // Define working hours (09:00 to 18:00)
+        const workingHours = [];
+        for (let i = 9; i <= 17; i++) {
+            workingHours.push(`${i.toString().padStart(2, '0')}:00`);
+        }
+
+        let currentUser = null;
+        let selectedDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+        let selectedRoom = rooms[0].id;
+        let allReservations = [];
+        let unsubscribeSnapshots = null;
+
+        // Booking context for modal
+        let bookingContext = {
+            time: null
+        };
+
+        // DOM Elements
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const datePicker = document.getElementById('date-picker');
+        const roomList = document.getElementById('room-list');
+        const timeline = document.getElementById('timeline');
+        const scheduleTitle = document.getElementById('schedule-title');
+        const scheduleSubtitle = document.getElementById('schedule-subtitle');
+        const modal = document.getElementById('booking-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalSubtitle = document.getElementById('modal-subtitle');
+        const bookerNameInput = document.getElementById('booker-name');
+        const meetingPurposeInput = document.getElementById('meeting-purpose');
+        const btnCancel = document.getElementById('btn-cancel');
+        const btnConfirm = document.getElementById('btn-confirm');
+        const errorMessage = document.getElementById('error-message');
+        const toast = document.getElementById('toast');
+        const toastMessage = document.getElementById('toast-message');
+        const userInfo = document.getElementById('user-info');
+        const utilizationRate = document.getElementById('utilization-rate');
+        const utilizationBar = document.getElementById('utilization-bar');
+
+        // Initialization
+        async function init() {
+            setupUI();
+            
+            try {
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Auth error:", error);
+                showToast("Authentication failed. Running in offline mode.", false);
+                loadingOverlay.style.display = 'none';
+            }
+
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    currentUser = user;
+                    userInfo.textContent = `User ID: ${user.uid.substring(0, 8)}...`;
+                    fetchReservations();
+                } else {
+                    currentUser = null;
+                }
+            });
+        }
+
+        // Setup Initial UI States
+        function setupUI() {
+            datePicker.value = selectedDate;
+            datePicker.addEventListener('change', (e) => {
+                selectedDate = e.target.value;
+                updateView();
+            });
+
+            renderRoomSelectors();
+
+            btnCancel.addEventListener('click', closeModal);
+            btnConfirm.addEventListener('click', handleBookingSubmit);
+            
+            // Close modal on outside click
+            modal.addEventListener('click', (e) => {
+                if(e.target === modal) closeModal();
+            });
+        }
+
+        // Render Room Sidebar Items
+        function renderRoomSelectors() {
+            roomList.innerHTML = '';
+            rooms.forEach(room => {
+                const btn = document.createElement('button');
+                const isSelected = selectedRoom === room.id;
+                
+                btn.className = `w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-all ${
+                    isSelected 
+                    ? 'bg-blue-50 text-blue-700 border border-blue-200 shadow-sm' 
+                    : 'text-slate-600 hover:bg-slate-50 border border-transparent'
+                }`;
+                
+                btn.innerHTML = `
+                    <div>
+                        <div class="font-medium">${room.name}</div>
+                        <div class="text-xs ${isSelected ? 'text-blue-500' : 'text-slate-400'} mt-0.5">Capacity: ${room.capacity}</div>
+                    </div>
+                    ${isSelected ? '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>' : ''}
+                `;
+                
+                btn.onclick = () => {
+                    selectedRoom = room.id;
+                    renderRoomSelectors();
+                    updateView();
+                };
+                
+                roomList.appendChild(btn);
+            });
+        }
+
+        // Fetch Data from Firestore
+        function fetchReservations() {
+            if (!currentUser) return;
+
+            const reservationsRef = collection(db, 'artifacts', appId, 'public', 'data', 'reservations');
+            
+            if (unsubscribeSnapshots) {
+                unsubscribeSnapshots();
+            }
+
+            // Using simple query as per RULES, filtering in JS
+            unsubscribeSnapshots = onSnapshot(reservationsRef, 
+                (snapshot) => {
+                    allReservations = [];
+                    snapshot.forEach((doc) => {
+                        allReservations.push({ id: doc.id, ...doc.data() });
+                    });
+                    
+                    // Hide loader on first data fetch
+                    if(loadingOverlay.style.display !== 'none') {
+                        loadingOverlay.style.display = 'none';
+                    }
+                    
+                    updateView();
+                },
+                (error) => {
+                    console.error("Firestore error:", error);
+                    showToast("Failed to sync data", false);
+                    loadingOverlay.style.display = 'none';
+                }
+            );
+        }
+
+        // Update the Main Content View
+        function updateView() {
+            const roomData = rooms.find(r => r.id === selectedRoom);
+            scheduleTitle.textContent = roomData.name;
+            
+            // Format date nicely
+            const dateObj = new Date(selectedDate);
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            scheduleSubtitle.textContent = dateObj.toLocaleDateString(undefined, options);
+
+            // Filter reservations for current context
+            const activeBookings = allReservations.filter(r => r.date === selectedDate && r.roomId === selectedRoom);
+            
+            // Calculate utilization
+            const bookedSlots = activeBookings.length;
+            const totalSlots = workingHours.length;
+            const utilization = Math.round((bookedSlots / totalSlots) * 100);
+            
+            utilizationRate.textContent = `${utilization}%`;
+            utilizationBar.style.width = `${utilization}%`;
+            
+            // Update color based on load
+            if (utilization > 80) utilizationBar.className = "bg-red-400 h-2 rounded-full transition-all duration-500";
+            else if (utilization > 50) utilizationBar.className = "bg-yellow-400 h-2 rounded-full transition-all duration-500";
+            else utilizationBar.className = "bg-white h-2 rounded-full transition-all duration-500";
+
+
+            renderTimeline(activeBookings);
+        }
+
+        // Render the Schedule Timeline
+        function renderTimeline(activeBookings) {
+            timeline.innerHTML = '';
+            
+            workingHours.forEach((timeStr, index) => {
+                const isLast = index === workingHours.length - 1;
+                const booking = activeBookings.find(b => b.time === timeStr);
+                
+                const timeRow = document.createElement('div');
+                timeRow.className = `flex group ${!isLast ? 'border-b border-slate-100' : ''}`;
+                
+                // Time label column
+                const timeCol = document.createElement('div');
+                timeCol.className = 'w-20 sm:w-24 py-5 pr-4 flex flex-col items-end border-r border-slate-100 shrink-0';
+                timeCol.innerHTML = `<span class="text-sm font-semibold text-slate-500">${timeStr}</span>`;
+                
+                // Slot content column
+                const contentCol = document.createElement('div');
+                contentCol.className = 'flex-grow p-2 pl-4 md:pl-6 min-h-[90px] relative';
+                
+                if (booking) {
+                    // Booked State
+                    const isOwnBooking = currentUser && booking.userId === currentUser.uid;
+                    contentCol.innerHTML = `
+                        <div class="h-full w-full bg-blue-50/60 border-l-4 border-blue-600 rounded-r-xl p-4 flex justify-between items-center transition-all hover:shadow-md">
+                            <div>
+                                <div class="font-bold text-slate-800 flex items-center gap-2">
+                                    ${escapeHtml(booking.purpose)}
+                                    ${isOwnBooking ? '<span class="bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5 rounded uppercase font-bold tracking-wider">Your Booking</span>' : ''}
+                                </div>
+                                <div class="text-sm text-slate-500 mt-1 flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                                    ${escapeHtml(booking.bookerName)}
+                                </div>
+                            </div>
+                            ${isOwnBooking ? `
+                                <button class="text-slate-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors delete-btn" data-id="${booking.id}">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                </button>
+                            ` : `
+                                <div class="text-slate-400 cursor-not-allowed">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                                </div>
+                            `}
+                        </div>
+                    `;
+
+                    // Attach delete event if owner
+                    if (isOwnBooking) {
+                        const delBtn = contentCol.querySelector('.delete-btn');
+                        delBtn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            cancelBooking(booking.id);
+                        });
+                    }
+
+                } else {
+                    // Available State
+                    contentCol.innerHTML = `
+                        <div class="h-full w-full border-2 border-dashed border-slate-200 hover:border-blue-400 bg-slate-50/30 hover:bg-blue-50/30 rounded-xl flex items-center justify-center cursor-pointer transition-all group-hover:shadow-sm booking-trigger">
+                            <span class="text-slate-400 group-hover:text-blue-500 font-medium flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                                Available - Click to Book
+                            </span>
+                        </div>
+                    `;
+                    
+                    const trigger = contentCol.querySelector('.booking-trigger');
+                    trigger.addEventListener('click', () => openModal(timeStr));
+                }
+
+                timeRow.appendChild(timeCol);
+                timeRow.appendChild(contentCol);
+                timeline.appendChild(timeRow);
+            });
+        }
+
+        // Modal Controls
+        function openModal(time) {
+            bookingContext.time = time;
+            
+            const roomData = rooms.find(r => r.id === selectedRoom);
+            modalTitle.textContent = `Book ${roomData.name}`;
+            
+            // Format nice display date
+            const dateObj = new Date(selectedDate);
+            const dateStr = dateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+            modalSubtitle.textContent = `${dateStr} • ${time} - ${parseInt(time)+1}:00`;
+            
+            // Reset form
+            bookerNameInput.value = '';
+            meetingPurposeInput.value = '';
+            errorMessage.classList.add('hidden');
+            
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            
+            // Small timeout to allow display flex to apply before focusing
+            setTimeout(() => bookerNameInput.focus(), 50);
+        }
+
+        function closeModal() {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            bookingContext.time = null;
+        }
+
+        // Handle Booking Submission
+        async function handleBookingSubmit() {
+            if (!currentUser) return;
+            
+            const name = bookerNameInput.value.trim();
+            const purpose = meetingPurposeInput.value.trim();
+            
+            if (!name || !purpose) {
+                errorMessage.textContent = 'Please fill out all fields.';
+                errorMessage.classList.remove('hidden');
+                return;
+            }
+
+            btnConfirm.disabled = true;
+            btnConfirm.innerHTML = '<div class="loader w-4 h-4 border-2 border-white rounded-full"></div> Booking...';
+
+            try {
+                const reservationsRef = collection(db, 'artifacts', appId, 'public', 'data', 'reservations');
+                await addDoc(reservationsRef, {
+                    roomId: selectedRoom,
+                    date: selectedDate,
+                    time: bookingContext.time,
+                    bookerName: name,
+                    purpose: purpose,
+                    userId: currentUser.uid,
+                    createdAt: serverTimestamp()
+                });
+                
+                closeModal();
+                showToast('Room booked successfully!');
+            } catch (error) {
+                console.error("Booking error: ", error);
+                errorMessage.textContent = 'Failed to book room. Please try again.';
+                errorMessage.classList.remove('hidden');
+            } finally {
+                btnConfirm.disabled = false;
+                btnConfirm.innerHTML = 'Confirm Booking';
+            }
+        }
+
+        // Handle Booking Cancellation
+        async function cancelBooking(bookingId) {
+            if (!currentUser) return;
+            
+            // Normally would use a confirm, but rules strictly say NO confirm().
+            // We'll proceed with deletion immediately, but in a real app might use a custom modal for confirmation.
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'reservations', bookingId);
+                await deleteDoc(docRef);
+                showToast('Booking cancelled.');
+            } catch (error) {
+                console.error("Delete error: ", error);
+                showToast('Failed to cancel booking.', false);
+            }
+        }
+
+        // Utility: Show Toast Notification
+        function showToast(message, isSuccess = true) {
+            toastMessage.textContent = message;
+            
+            const icon = toast.querySelector('svg');
+            if (isSuccess) {
+                icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>';
+                icon.className = 'w-6 h-6 text-green-400';
+            } else {
+                icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>';
+                icon.className = 'w-6 h-6 text-red-400';
+            }
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        // Utility: XSS Prevention
+        function escapeHtml(unsafe) {
+            return unsafe
+                 .replace(/&/g, "&amp;")
+                 .replace(/</g, "&lt;")
+                 .replace(/>/g, "&gt;")
+                 .replace(/"/g, "&quot;")
+                 .replace(/'/g, "&#039;");
+        }
+
+        // Start Application
+        window.addEventListener('DOMContentLoaded', init);
+
+    </script>
+</body>
+</html>
